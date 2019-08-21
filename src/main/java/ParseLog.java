@@ -34,7 +34,7 @@ class ParseLog {
         }
 
         long n = Long.parseLong(args[0]);
-        logger.info("Finding user id's that have visited {}.", n);
+        logger.info("Finding userId's that have visited {}.", n);
 
         long startTimeStampSeconds = getSplitTimeStampSeconds();
         try {
@@ -63,7 +63,7 @@ class ParseLog {
 
         assert files != null;
 
-        logger.info("Finding userIds in each split that have visited n or more distinct paths.");
+        logger.info("Finding userId's in each split that have visited n or more distinct paths.");
         for (File file : files) {
             try {
                 parseLog.parseSplitFile(n, Paths.get(file.getPath()));
