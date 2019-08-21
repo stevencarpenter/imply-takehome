@@ -1,5 +1,6 @@
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,22 +19,35 @@ import java.util.stream.Stream;
 
 
 @Data
-@RequiredArgsConstructor
 class ParseLog {
+    final static Logger logger = LogManager.getLogger(ParseLog.class);
 
-
+    /**
+     * Main function
+     *
+     * @param args
+     */
     public static void main(String[] args) {
 
         long n = Long.parseLong(args[0]);
+        logger.info("Finding user id's that have visited {}.", n);
 
         long startTimeStampSeconds = getSplitTimeStampSeconds();
+        try {
+            cleanOutputFile(Paths.get("MatchedIds.txt"));
+        } catch (IOException e) {
+            logger.error("Cannot truncate MatchedIds.txt. Ensure that it exists.");
+            System.exit(-1);
+        }
 
         PrepareTempFiles prepareTempFiles = new PrepareTempFiles();
 
+        logger.info("Creating splits based on the last 3 digits of the userId.");
         try {
             prepareTempFiles.splitLog(Paths.get("access.log"));
         } catch (IOException e) {
-            System.out.println(e);
+            logger.error("Cannot perform split on access log.");
+            System.exit(-1);
         }
 
 
@@ -43,11 +58,13 @@ class ParseLog {
         long splitTimeStampSeconds = getSplitTimeStampSeconds();
 
         assert files != null;
+
+        logger.info("Finding userIds in each split that have visited n or more distinct paths.");
         for (File file : files) {
             try {
-                parseLog.readLines(n, Paths.get(file.getPath()));
+                parseLog.parseSplitFile(n, Paths.get(file.getPath()));
             } catch (IOException e) {
-                continue;
+                logger.info("No temp file found for ids ending in {}", file.getName());
             }
         }
 
@@ -55,19 +72,40 @@ class ParseLog {
 
         parseLog.cleanTempDirectory(folder);
 
-        System.out.println(String.format("Start epoch: %s", startTimeStampSeconds));
-        System.out.println(String.format("Split epoch: %s", splitTimeStampSeconds));
-        System.out.println(String.format("End epoch: %s", endTimeStampSeconds));
-        System.out.println(String.format("Total Seconds: %s", endTimeStampSeconds - startTimeStampSeconds));
-
+        logger.info("Start epoch: {}", startTimeStampSeconds);
+        logger.info("Split epoch: {}", splitTimeStampSeconds);
+        logger.info("End epoch: {}", endTimeStampSeconds);
+        logger.info("Total Seconds: {}", endTimeStampSeconds - startTimeStampSeconds);
     }
 
+    /**
+     * Truncate the output file so that it is empty before running.
+     *
+     * @param path Path to MatchedIds.txt
+     * @throws IOException
+     */
+    private static void cleanOutputFile(Path path) throws IOException {
+        Files.write(path, new byte[0], StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+    /**
+     * Helper method to get epoch times for benchmarking.
+     *
+     * @return Time in epoch seconds.
+     */
     private static long getSplitTimeStampSeconds() {
         Instant splitInstant = Instant.now();
         return splitInstant.getEpochSecond();
     }
 
-    private void readLines(Long n, Path file) throws IOException {
+    /**
+     * Parse a split file and write out all user ids that have visited n unique paths.
+     *
+     * @param n    Number of unique paths required to be matched
+     * @param file Path to temp split file to parse
+     * @throws IOException
+     */
+    private void parseSplitFile(Long n, Path file) throws IOException {
         Map<Long, List<String>> cache = new HashMap<>();
         List<Long> satisfied = new ArrayList<>(); // doubles every time it exceeds allocation
         Stream<String> lines = Files.lines(file);
@@ -103,17 +141,27 @@ class ParseLog {
         lines.close();
     }
 
+    /**
+     * Write out a matched user id to the success file.
+     *
+     * @param key user id to be written
+     */
     private void writeToMatchedIds(long key) {
         try (BufferedWriter successWriter = new BufferedWriter(new FileWriter("MatchedIds.txt", true))) {
             successWriter.write(Long.toString(key));
             successWriter.newLine();
 
         } catch (IOException e) {
-            System.out.println("Can't write for some reason.");
-            System.out.println(e);
+            logger.error("Can't write to success file.");
+            System.exit(-1);
         }
     }
 
+    /**
+     * Clean up temp files when done.
+     *
+     * @param dir temp file directory
+     */
     private void cleanTempDirectory(File dir) {
         for (File file : dir.listFiles()) {
             file.delete();
