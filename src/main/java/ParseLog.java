@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,47 +29,27 @@ class ParseLog {
 
 
     private void readLines(Long n, Path file) throws IOException {
-
-
-        Long fileToBeParsedSize = Files.size(file);
-        if (fileToBeParsedSize == fileSize || fileToBeParsedSize == 0) {
-            System.out.println("Results are stored in ./File");
-            return;
-        }
-
-        fileSize = fileToBeParsedSize;
-
         Map<Long, List<String>> cache = new HashMap<>();
-//        List<Long> satisfied = new ArrayList<>(); // doubles every time it exceeds allocation
-        //Get the file reference
-
+        List<Long> satisfied = new ArrayList<>(); // doubles every time it exceeds allocation
         Stream<String> lines = Files.lines(file);
-
-        lines.parallel().forEach(line -> {
+        lines.forEach(line -> {
             String[] lineArray = line.split(",");
             long key = Long.parseLong(lineArray[1]);
-            try (Stream<String> satisfied = Files.lines(Paths.get("MatchedIds.txt"))) {
-                satisfied.forEach(id -> {
-                    if (Long.parseLong(id) == key) {
-                        return;
-                    }
-                });
-            } catch (IOException e) {
-                System.out.println(e);
-            }
 
+            if (satisfied.contains(key)) return;
 
             if (cache.containsKey(key)) {
                 List<String> record = cache.get(key);
                 int userPathCount = record.size();
-                if (userPathCount == n - 1) {
+                if (userPathCount == n - 1 && !record.contains(lineArray[2])) {
                     try (BufferedWriter successWriter = new BufferedWriter(new FileWriter("MatchedIds.txt", true))) {
-
                         successWriter.write(Long.toString(key));
                         successWriter.newLine();
+                        satisfied.add(key);
                         cache.remove(key);
                     } catch (IOException e) {
                         System.out.println("Can't write for some reason.");
+                        System.out.println(e);
                     }
                 } else {
                     record.add(lineArray[2]);
@@ -81,19 +62,51 @@ class ParseLog {
                 cache.put(key, pathList);
             }
         });
-
-
         lines.close();
     }
 
+
     public static void main(String[] args) {
 
+        Instant startInstant = Instant.now();
+        long startTimeStampSeconds = startInstant.getEpochSecond();
 
-        ParseLog parseLog = new ParseLog();
+        PrepareTempFiles prepareTempFiles = new PrepareTempFiles();
+
         try {
-            parseLog.readLines(50L, Paths.get("access.log"));
+            prepareTempFiles.splitLog(Paths.get("access.log"));
         } catch (IOException e) {
             System.out.println(e);
         }
+
+
+        ParseLog parseLog = new ParseLog();
+        File folder = new File("temp/");
+
+        File[] files = folder.listFiles();
+
+        Instant splitInstant = Instant.now();
+        long splitTimeStampSeconds = splitInstant.getEpochSecond();
+
+        assert files != null;
+        for (File file : files) {
+            try {
+                parseLog.readLines(10L, Paths.get(file.getPath()));
+
+
+            } catch (IOException e) {
+                continue;
+            }
+        }
+
+        Instant endInstant = Instant.now();
+        long endTimeStampSeconds = endInstant.getEpochSecond();
+
+        System.out.println(String.format("Start epoch: %s", startTimeStampSeconds));
+        System.out.println(String.format("Split epoch: %s", splitTimeStampSeconds));
+        System.out.println(String.format("End epoch: %s", endTimeStampSeconds));
+        System.out.println(String.format("Total Seconds: %s", endTimeStampSeconds - startTimeStampSeconds));
+
+
     }
 }
