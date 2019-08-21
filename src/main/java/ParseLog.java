@@ -25,9 +25,13 @@ class ParseLog {
     /**
      * Main function
      *
-     * @param args
+     * @param args command line args
      */
     public static void main(String[] args) {
+        if (args.length < 1) {
+            logger.error("Number of distinct paths not specified");
+            System.exit(-1);
+        }
 
         long n = Long.parseLong(args[0]);
         logger.info("Finding user id's that have visited {}.", n);
