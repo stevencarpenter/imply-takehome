@@ -10,9 +10,9 @@ import java.util.stream.Stream;
 @Data
 class PrepareTempFiles {
 
-    public void splitLog(Path filePath) throws IOException {
+    void splitLog(Path filePath) throws IOException {
         Stream<String> lines = Files.lines(filePath);
-        lines.forEach(line -> {
+        lines.parallel().forEach(line -> {
             String userId = line.split(",")[1];
             if (userId.length() <= 3) {
                 write(line, userId);
