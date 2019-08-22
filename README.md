@@ -52,6 +52,8 @@ When I poked through the temp files I noticed that they were all ~1,000 records 
 
 I also assumed that the userId max could get significantly large that the number of digits on the end of the userId to be used for temp files could be increased if needed though I did not make this configurable for this test.
 
+One large assumption that I made is that the data would always be clean like the test data that was provided. In an ideal world everything will come in clean but it doesn't always and this program would benefit from tests that ensured the helper functions handle potential weirdness in their inputs. I tested it thoroughly with manual inputs, but I would not make the same assumption or treat a production system quite the same.
+
 ## Thanks!
 
 I appreciate you taking the time to read this and test out my implementation! I'm sure there are much better and worse ways to solve this problem but this is what I came up with over the past couple days. I enjoyed the exercise and I look forward to your feedback.
